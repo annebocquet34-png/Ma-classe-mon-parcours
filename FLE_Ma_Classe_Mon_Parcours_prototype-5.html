@@ -77,10 +77,13 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:11px;bor
 <section id="exercise" class="hidden">
 <div class="card"><span class="tag">Exercice personnalisé · B2</span><h2>Prépositions : à / de / en</h2>
 <p><b>1.</b> Je suis content ___ vous revoir.</p>
-<button class="answer" onclick="check(this,false)">de</button><button class="answer" onclick="check(this,true)">à</button>
+<button class="answer" onclick="check(1,this,false)">de</button><button class="answer" onclick="check(1,this,true)">à</button>
 <p><b>2.</b> Elle habite ___ Lyon depuis cinq ans.</p>
-<button class="answer" onclick="check(this,true)">à</button><button class="answer" onclick="check(this,false)">en</button>
-<div id="feedback"></div></div>
+<button class="answer" onclick="check(2,this,true)">à</button><button class="answer" onclick="check(2,this,false)">en</button>
+<div id="feedback"></div>
+<button class="primary" id="submitExerciseBtn" style="margin-top:14px" onclick="enregistrerTentative()" disabled>Valider mes réponses</button>
+<p id="submitMessage" class="small"></p>
+</div>
 </section>
 
 <section id="progress" class="hidden"><div class="grid">
@@ -88,7 +91,7 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:11px;bor
 <div class="card"><h2>Derniers résultats</h2><p>Prépositions : <b>80 %</b></p><p>Passé composé : <b>90 %</b></p><p>Expression orale : <b>70 %</b></p></div>
 </div></section>
 
-<section id="teacher" class="hidden"><div class="card"><h2>Historique de la classe</h2>
+<section id="teacher" class="hidden"><div class="card"><h2>Ma classe · historique des tentatives</h2>
 <div id="historique-classe"><p class="small">Chargement...</p></div>
 <h3>🤖 Générateur de séance IA</h3><p>« Prépare une séance de 90 minutes à partir des difficultés de ma classe. »</p>
 <button class="primary" onclick="alert('Prototype : génération d\'une séance différenciée IA.')">Générer la séance</button>
@@ -125,10 +128,17 @@ function show(id){
   }
 }
 
-function check(el,ok){
+const exerciseReponses = {};
+
+function check(question, el, ok){
+  exerciseReponses[question] = ok;
   document.getElementById('feedback').innerHTML = ok
     ? '<p class="ok">✓ Bonne réponse !</p>'
     : '<p class="bad">✗ À revoir. La bonne réponse dépend du contexte.</p>';
+
+  const total = 2;
+  const repondu = Object.keys(exerciseReponses).length;
+  document.getElementById('submitExerciseBtn').disabled = (repondu < total);
 }
 
 function toggleAuth(which){
@@ -225,38 +235,96 @@ function onAuthenticated(){
   show('student');
 }
 
-async function chargerHistoriqueClasse(){
-  const zone = document.getElementById('historique-classe');
-  zone.innerHTML = '<p class="small">Chargement...</p>';
+// Charge l'historique des tentatives de tous les élèves (visible pour l'enseignant grâce aux policies RLS)
+async function enregistrerTentative(){
+  const msg = document.getElementById('submitMessage');
+  msg.textContent = 'Envoi en cours...';
+  msg.style.color = '#66788a';
   try{
-    const { data, error } = await sb
-      .from('attempts')
-      .select('attempted_at, score, teacher_notes, profiles(full_name, email), exercises(title, level)')
-      .order('attempted_at', { ascending: false });
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user){ msg.textContent = 'Vous devez être connecté(e).'; msg.style.color = '#bd3e45'; return; }
 
-    if (error){
-      zone.innerHTML = '<p class="bad">Erreur lors du chargement : ' + error.message + '</p>';
+    const { data: exo, error: exoError } = await sb
+      .from('exercises')
+      .select('id')
+      .eq('title', 'Prépositions : à / de / en')
+      .limit(1)
+      .single();
+
+    if (exoError || !exo){
+      msg.textContent = "Erreur : exercice introuvable dans la base.";
+      msg.style.color = '#bd3e45';
       return;
     }
-    if (!data || data.length === 0){
-      zone.innerHTML = '<p class="small">Aucune tentative enregistrée pour le moment.</p>';
-      return;
-    }
 
-    let html = '<table><tr><th>Étudiant</th><th>Exercice</th><th>Niveau</th><th>Score</th><th>Date</th></tr>';
-    data.forEach(a => {
-      const nom = (a.profiles && (a.profiles.full_name || a.profiles.email)) || 'Inconnu';
-      const titre = (a.exercises && a.exercises.title) || 'Exercice supprimé';
-      const niveau = (a.exercises && a.exercises.level) || '—';
-      const score = (a.score !== null && a.score !== undefined) ? a.score + ' %' : '—';
-      const date = a.attempted_at ? new Date(a.attempted_at).toLocaleString('fr-FR') : '—';
-      html += '<tr><td>' + nom + '</td><td>' + titre + '</td><td>' + niveau + '</td><td>' + score + '</td><td>' + date + '</td></tr>';
+    const total = Object.keys(exerciseReponses).length;
+    const correctes = Object.values(exerciseReponses).filter(v => v === true).length;
+    const score = total > 0 ? Math.round((correctes / total) * 100) : 0;
+    const erreurs = Object.entries(exerciseReponses)
+      .filter(([q, ok]) => !ok)
+      .map(([q]) => 'question ' + q);
+
+    const { error: insertError } = await sb.from('attempts').insert({
+      student_id: user.id,
+      exercise_id: exo.id,
+      score: score,
+      errors: erreurs
     });
-    html += '</table>';
-    zone.innerHTML = html;
+
+    if (insertError){
+      msg.textContent = 'Erreur lors de l\'enregistrement : ' + insertError.message;
+      msg.style.color = '#bd3e45';
+      return;
+    }
+
+    msg.textContent = 'Résultat enregistré (' + score + ' %) !';
+    msg.style.color = '#16804b';
   } catch(e){
-    zone.innerHTML = '<p class="bad">Erreur inattendue : ' + e.message + '</p>';
+    msg.textContent = 'Erreur inattendue : ' + e.message;
+    msg.style.color = '#bd3e45';
   }
+}
+
+async function chargerHistoriqueClasse(){
+  const conteneur = document.getElementById('historique-classe');
+  conteneur.innerHTML = '<p class="small">Chargement...</p>';
+
+  if (!sb){ conteneur.innerHTML = '<p class="small bad">Supabase non initialisé.</p>'; return; }
+
+  const { data, error } = await sb
+    .from('attempts')
+    .select(`
+      id,
+      attempted_at,
+      score,
+      errors,
+      teacher_notes,
+      profiles ( id, full_name, email ),
+      exercises ( title, level )
+    `)
+    .order('attempted_at', { ascending: false });
+
+  if (error){
+    conteneur.innerHTML = '<p class="small bad">Erreur de chargement : ' + error.message + '</p>';
+    return;
+  }
+
+  if (!data || data.length === 0){
+    conteneur.innerHTML = '<p class="small">Aucune tentative enregistrée pour le moment.</p>';
+    return;
+  }
+
+  let html = '<table><tr><th>Étudiant</th><th>Exercice</th><th>Niveau</th><th>Score</th><th>Date</th></tr>';
+  data.forEach(t => {
+    const nomEtudiant = (t.profiles && (t.profiles.full_name || t.profiles.email)) || 'Inconnu';
+    const titreExercice = (t.exercises && t.exercises.title) || '—';
+    const niveauExercice = (t.exercises && t.exercises.level) || '—';
+    const date = new Date(t.attempted_at).toLocaleDateString('fr-FR');
+    html += `<tr><td>${nomEtudiant}</td><td>${titreExercice}</td><td>${niveauExercice}</td><td>${t.score ?? '—'}</td><td>${date}</td></tr>`;
+  });
+  html += '</table>';
+
+  conteneur.innerHTML = html;
 }
 
 // Au chargement, vérifie si une session existe déjà

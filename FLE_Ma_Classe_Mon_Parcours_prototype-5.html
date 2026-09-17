@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FLE · Ma Classe, Mon Parcours</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+body{font-family:Arial,sans-serif;margin:0;background:#f4f7fb;color:#18324b}
+header{background:white;padding:22px 28px;border-bottom:1px solid #dce5ef;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+h1{margin:0;font-size:26px} .sub{color:#66788a;margin-top:6px}
+nav{display:flex;gap:8px;padding:14px 20px;background:#183b63;flex-wrap:wrap}
+nav button{border:0;background:#fff;color:#183b63;padding:10px 15px;border-radius:8px;cursor:pointer}
+main{max-width:1100px;margin:24px auto;padding:0 18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+.card{background:#fff;border-radius:14px;padding:20px;box-shadow:0 3px 14px #18324b18}
+.metric{font-size:28px;font-weight:700;margin:8px 0}.tag{display:inline-block;padding:5px 9px;background:#e8f3ff;border-radius:20px;font-size:12px}
+.bar{height:9px;background:#e5edf5;border-radius:8px;overflow:hidden}.bar i{display:block;height:100%;background:#168c9b}
+button.primary{background:#234bc7;color:white;border:0;padding:11px 16px;border-radius:8px;cursor:pointer}
+button.link{background:none;border:0;color:#234bc7;cursor:pointer;text-decoration:underline;padding:0}
+.exercise{margin-top:16px}.answer{width:100%;padding:11px;margin:7px 0;border:1px solid #ccd8e4;border-radius:8px}
+.ok{color:#16804b}.bad{color:#bd3e45}.hidden{display:none}
+table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:11px;border-bottom:1px solid #e7edf3}
+.field{width:100%;padding:11px;margin:7px 0;border:1px solid #ccd8e4;border-radius:8px;box-sizing:border-box}
+.auth-card{max-width:380px;margin:60px auto}
+.small{font-size:13px;color:#66788a}
+#logoutBtn{background:#fff;color:#bd3e45;border:1px solid #f0d0d2;padding:8px 14px;border-radius:8px;cursor:pointer}
+</style>
+</head>
+<body>
+<header>
+<div><h1>🌿 FLE · Ma Classe, Mon Parcours</h1><div class="sub">Plateforme de FLE personnalisée par l'IA</div></div>
+<button id="logoutBtn" class="hidden" onclick="logout()">Se déconnecter</button>
+</header>
+
+<nav id="mainNav" class="hidden">
+<button onclick="show('student')">👩‍🎓 Mon profil</button>
+<button onclick="show('exercise')">✏️ Mes exercices</button>
+<button onclick="show('progress')">📈 Ma progression</button>
+<button onclick="show('teacher')">👩‍🏫 Espace enseignant</button>
+</nav>
+
+<main>
+
+<!-- Écran de connexion / inscription -->
+<section id="auth">
+<div class="card auth-card">
+  <h2 id="authTitle">Connexion</h2>
+
+  <div id="loginForm">
+    <input id="loginEmail" class="field" type="email" placeholder="Email">
+    <input id="loginPassword" class="field" type="password" placeholder="Mot de passe">
+    <button class="primary" style="width:100%" onclick="login()">Se connecter</button>
+    <p class="small">Pas encore de compte ? <button class="link" onclick="toggleAuth('signup')">S'inscrire avec un code</button></p>
+  </div>
+
+  <div id="signupForm" class="hidden">
+    <input id="signupName" class="field" type="text" placeholder="Nom complet">
+    <input id="signupEmail" class="field" type="email" placeholder="Email">
+    <input id="signupPassword" class="field" type="password" placeholder="Mot de passe (6 caractères min.)">
+    <input id="signupCode" class="field" type="text" placeholder="Code d'invitation">
+    <button class="primary" style="width:100%" onclick="signup()">Créer mon compte</button>
+    <p class="small">Déjà un compte ? <button class="link" onclick="toggleAuth('login')">Se connecter</button></p>
+  </div>
+
+  <p id="authMessage" class="small"></p>
+</div>
+</section>
+
+<section id="student" class="hidden">
+<div class="grid">
+<div class="card"><h2>Marie Dupont</h2><span class="tag">B2</span><p>Objectif : améliorer l'expression orale et la précision grammaticale.</p><h3>Compétences</h3>
+<p>Compréhension écrite</p><div class="bar"><i style="width:78%"></i></div><p>Grammaire</p><div class="bar"><i style="width:68%"></i></div><p>Expression orale</p><div class="bar"><i style="width:58%"></i></div></div>
+<div class="card"><h2>Mes priorités</h2><p>🔴 Prépositions</p><p>🟠 Subjonctif</p><p>🟠 Expression orale</p><p>🟢 Vocabulaire professionnel</p><button class="primary" onclick="show('exercise')">Commencer mon parcours</button></div>
+</div>
+</section>
+
+<section id="exercise" class="hidden">
+<div class="card"><span class="tag">Exercice personnalisé · B2</span><h2>Prépositions : à / de / en</h2>
+<p><b>1.</b> Je suis content ___ vous revoir.</p>
+<button class="answer" onclick="check(this,false)">de</button><button class="answer" onclick="check(this,true)">à</button>
+<p><b>2.</b> Elle habite ___ Lyon depuis cinq ans.</p>
+<button class="answer" onclick="check(this,true)">à</button><button class="answer" onclick="check(this,false)">en</button>
+<div id="feedback"></div></div>
+</section>
+
+<section id="progress" class="hidden"><div class="grid">
+<div class="card"><h2>Ma progression</h2><div class="metric">72 %</div><p>Progression générale</p><div class="bar"><i style="width:72%"></i></div></div>
+<div class="card"><h2>Derniers résultats</h2><p>Prépositions : <b>80 %</b></p><p>Passé composé : <b>90 %</b></p><p>Expression orale : <b>70 %</b></p></div>
+</div></section>
+
+<section id="teacher" class="hidden"><div class="card"><h2>Ma classe B2 · 6 étudiants</h2>
+<table><tr><th>Étudiant</th><th>Niveau</th><th>Priorité</th><th>Progression</th></tr>
+<tr><td>Marie</td><td>B2</td><td>Prépositions</td><td>78 %</td></tr>
+<tr><td>Ahmed</td><td>B1+</td><td>Passé composé</td><td>64 %</td></tr>
+<tr><td>Sofia</td><td>B2</td><td>Expression orale</td><td>72 %</td></tr>
+<tr><td>Paul</td><td>B2</td><td>Connecteurs</td><td>66 %</td></tr></table>
+<h3>🤖 Générateur de séance IA</h3><p>« Prépare une séance de 90 minutes à partir des difficultés de ma classe. »</p>
+<button class="primary" onclick="alert('Prototype : génération d\'une séance différenciée IA.')">Générer la séance</button>
+</div></section>
+</main>
+
+<script>
+// Affiche toute erreur JS (même celles hors des fonctions ci-dessous) directement
+// dans la page, pour pouvoir diagnostiquer sans console développeur.
+window.addEventListener('error', function(e){
+  setAuthMessage('Erreur JavaScript : ' + e.message, true);
+});
+window.addEventListener('unhandledrejection', function(e){
+  setAuthMessage('Erreur : ' + (e.reason && e.reason.message ? e.reason.message : e.reason), true);
+});
+
+// ⚠️ Clé publique (anon) : sans danger à exposer côté client, la sécurité réelle
+// vient des policies RLS définies dans Supabase.
+const SUPABASE_URL = "https://bqrqhevdscrfwmibwrpq.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_FhQMA1rjYBq4PV9isW5yoA_l71-0c2O";
+
+let sb = null;
+if (!window.supabase){
+  setAuthMessage("La bibliothèque Supabase n'a pas pu se charger (vérifiez votre connexion internet ou un bloqueur de publicités), puis rechargez la page.", true);
+} else {
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+function show(id){
+  document.querySelectorAll('main section').forEach(x=>x.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+function check(el,ok){
+  document.getElementById('feedback').innerHTML = ok
+    ? '<p class="ok">✓ Bonne réponse !</p>'
+    : '<p class="bad">✗ À revoir. La bonne réponse dépend du contexte.</p>';
+}
+
+function toggleAuth(which){
+  document.getElementById('loginForm').classList.toggle('hidden', which !== 'login');
+  document.getElementById('signupForm').classList.toggle('hidden', which !== 'signup');
+  document.getElementById('authTitle').textContent = which === 'login' ? 'Connexion' : 'Créer un compte';
+  document.getElementById('authMessage').textContent = '';
+}
+
+function setAuthMessage(text, isError){
+  const el = document.getElementById('authMessage');
+  el.textContent = text;
+  el.style.color = isError ? '#bd3e45' : '#16804b';
+}
+
+async function login(){
+  try{
+    if (!sb){ setAuthMessage("Supabase n'est pas initialisé — rechargez la page.", true); return; }
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    if (!email || !password){ setAuthMessage('Merci de remplir email et mot de passe.', true); return; }
+    setAuthMessage('Connexion en cours...', false);
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error){ setAuthMessage(error.message, true); return; }
+    onAuthenticated();
+  } catch(e){
+    setAuthMessage('Erreur inattendue (connexion) : ' + e.message, true);
+  }
+}
+
+async function signup(){
+  try{
+    if (!sb){ setAuthMessage("Supabase n'est pas initialisé — rechargez la page.", true); return; }
+
+    const full_name = document.getElementById('signupName').value.trim();
+    const email = document.getElementById('signupEmail').value.trim();
+    const password = document.getElementById('signupPassword').value;
+    const code = document.getElementById('signupCode').value.trim();
+
+    if (!full_name || !email || !password || !code){
+      setAuthMessage('Merci de remplir tous les champs.', true);
+      return;
+    }
+    if (password.length < 6){
+      setAuthMessage('Le mot de passe doit faire au moins 6 caractères.', true);
+      return;
+    }
+
+    setAuthMessage('Création du compte...', false);
+    const { data, error } = await sb.auth.signUp({
+      email, password,
+      options: { data: { full_name } }
+    });
+    if (error){ setAuthMessage(error.message, true); return; }
+
+    const user = data.user;
+    if (!user){
+      setAuthMessage('Compte créé. Vérifiez votre email pour confirmer, puis connectez-vous.', false);
+      return;
+    }
+
+    // Valide le code d'invitation et associe le niveau au profil
+    const { data: ok, error: rpcError } = await sb.rpc('use_invitation_code', {
+      input_code: code,
+      student_id: user.id
+    });
+
+    if (rpcError){
+      setAuthMessage("Compte créé, mais erreur lors de la validation du code : " + rpcError.message, true);
+      return;
+    }
+    if (!ok){
+      setAuthMessage("Compte créé, mais le code d'invitation est invalide ou déjà utilisé. Contactez votre enseignant.", true);
+      return;
+    }
+
+    setAuthMessage('Compte créé avec succès !', false);
+    onAuthenticated();
+  } catch(e){
+    setAuthMessage('Erreur inattendue (inscription) : ' + e.message, true);
+  }
+}
+
+async function logout(){
+  await sb.auth.signOut();
+  document.getElementById('mainNav').classList.add('hidden');
+  document.getElementById('logoutBtn').classList.add('hidden');
+  show('auth');
+}
+
+function onAuthenticated(){
+  document.getElementById('mainNav').classList.remove('hidden');
+  document.getElementById('logoutBtn').classList.remove('hidden');
+  show('student');
+}
+
+// Au chargement, vérifie si une session existe déjà
+(async () => {
+  try{
+    if (!sb) return;
+    const { data: { session } } = await sb.auth.getSession();
+    if (session){ onAuthenticated(); } else { show('auth'); }
+  } catch(e){
+    setAuthMessage('Erreur au chargement : ' + e.message, true);
+  }
+})();
+</script>
+</body></html>

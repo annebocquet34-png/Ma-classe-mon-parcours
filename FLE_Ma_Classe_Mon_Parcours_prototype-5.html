@@ -88,12 +88,8 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:11px;bor
 <div class="card"><h2>Derniers résultats</h2><p>Prépositions : <b>80 %</b></p><p>Passé composé : <b>90 %</b></p><p>Expression orale : <b>70 %</b></p></div>
 </div></section>
 
-<section id="teacher" class="hidden"><div class="card"><h2>Ma classe B2 · 6 étudiants</h2>
-<table><tr><th>Étudiant</th><th>Niveau</th><th>Priorité</th><th>Progression</th></tr>
-<tr><td>Marie</td><td>B2</td><td>Prépositions</td><td>78 %</td></tr>
-<tr><td>Ahmed</td><td>B1+</td><td>Passé composé</td><td>64 %</td></tr>
-<tr><td>Sofia</td><td>B2</td><td>Expression orale</td><td>72 %</td></tr>
-<tr><td>Paul</td><td>B2</td><td>Connecteurs</td><td>66 %</td></tr></table>
+<section id="teacher" class="hidden"><div class="card"><h2>Historique de la classe</h2>
+<div id="historique-classe"><p class="small">Chargement...</p></div>
 <h3>🤖 Générateur de séance IA</h3><p>« Prépare une séance de 90 minutes à partir des difficultés de ma classe. »</p>
 <button class="primary" onclick="alert('Prototype : génération d\'une séance différenciée IA.')">Générer la séance</button>
 </div></section>
@@ -124,6 +120,9 @@ if (!window.supabase){
 function show(id){
   document.querySelectorAll('main section').forEach(x=>x.classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
+  if (id === 'teacher'){
+    chargerHistoriqueClasse();
+  }
 }
 
 function check(el,ok){
@@ -224,6 +223,40 @@ function onAuthenticated(){
   document.getElementById('mainNav').classList.remove('hidden');
   document.getElementById('logoutBtn').classList.remove('hidden');
   show('student');
+}
+
+async function chargerHistoriqueClasse(){
+  const zone = document.getElementById('historique-classe');
+  zone.innerHTML = '<p class="small">Chargement...</p>';
+  try{
+    const { data, error } = await sb
+      .from('attempts')
+      .select('attempted_at, score, teacher_notes, profiles(full_name, email), exercises(title, level)')
+      .order('attempted_at', { ascending: false });
+
+    if (error){
+      zone.innerHTML = '<p class="bad">Erreur lors du chargement : ' + error.message + '</p>';
+      return;
+    }
+    if (!data || data.length === 0){
+      zone.innerHTML = '<p class="small">Aucune tentative enregistrée pour le moment.</p>';
+      return;
+    }
+
+    let html = '<table><tr><th>Étudiant</th><th>Exercice</th><th>Niveau</th><th>Score</th><th>Date</th></tr>';
+    data.forEach(a => {
+      const nom = (a.profiles && (a.profiles.full_name || a.profiles.email)) || 'Inconnu';
+      const titre = (a.exercises && a.exercises.title) || 'Exercice supprimé';
+      const niveau = (a.exercises && a.exercises.level) || '—';
+      const score = (a.score !== null && a.score !== undefined) ? a.score + ' %' : '—';
+      const date = a.attempted_at ? new Date(a.attempted_at).toLocaleString('fr-FR') : '—';
+      html += '<tr><td>' + nom + '</td><td>' + titre + '</td><td>' + niveau + '</td><td>' + score + '</td><td>' + date + '</td></tr>';
+    });
+    html += '</table>';
+    zone.innerHTML = html;
+  } catch(e){
+    zone.innerHTML = '<p class="bad">Erreur inattendue : ' + e.message + '</p>';
+  }
 }
 
 // Au chargement, vérifie si une session existe déjà

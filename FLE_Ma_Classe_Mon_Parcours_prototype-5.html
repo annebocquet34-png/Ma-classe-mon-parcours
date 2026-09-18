@@ -75,15 +75,28 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:11px;bor
 </section>
 
 <section id="exercise" class="hidden">
-<div class="card"><span class="tag">Exercice personnalisé · B2</span><h2>Prépositions : à / de / en</h2>
-<p><b>1.</b> Je suis content ___ vous revoir.</p>
-<button class="answer" onclick="check(1,this,false)">de</button><button class="answer" onclick="check(1,this,true)">à</button>
-<p><b>2.</b> Elle habite ___ Lyon depuis cinq ans.</p>
-<button class="answer" onclick="check(2,this,true)">à</button><button class="answer" onclick="check(2,this,false)">en</button>
+
+<div id="exercise-categories" class="card">
+<h2>Choisis une catégorie</h2>
+<div id="categories-list" class="grid"><p class="small">Chargement...</p></div>
+</div>
+
+<div id="exercise-list-view" class="card hidden">
+<button class="link" onclick="afficherCategories()">← Retour aux catégories</button>
+<h2 id="categoryTitle"></h2>
+<div id="exercises-list"></div>
+</div>
+
+<div id="exercise-detail-view" class="card hidden">
+<button class="link" onclick="afficherExercicesCategorie()">← Retour à la liste</button>
+<span class="tag" id="exerciseTag"></span>
+<h2 id="exerciseTitle"></h2>
+<div id="questionsContainer"></div>
 <div id="feedback"></div>
 <button class="primary" id="submitExerciseBtn" style="margin-top:14px" onclick="enregistrerTentative()" disabled>Valider mes réponses</button>
 <p id="submitMessage" class="small"></p>
 </div>
+
 </section>
 
 <section id="progress" class="hidden"><div class="grid">
@@ -126,9 +139,105 @@ function show(id){
   if (id === 'teacher'){
     chargerHistoriqueClasse();
   }
+  if (id === 'exercise'){
+    afficherCategories();
+  }
 }
 
+const CATEGORIES = [
+  { id: 'grammaire', label: '📘 Grammaire' },
+  { id: 'conjugaison', label: '🔤 Conjugaison' },
+  { id: 'phonetique', label: '🔊 Phonétique' },
+  { id: 'pratique-orale', label: '🗣️ Pratique orale' },
+  { id: 'pratique-ecrite', label: '✍️ Pratique écrite' },
+  { id: 'comprehension-ecrite', label: '📖 Compréhension écrite' },
+  { id: 'comprehension-orale', label: '🎧 Compréhension orale' }
+];
+
+let categorieActuelle = null;
+let exerciceActuel = null;
 const exerciseReponses = {};
+
+function afficherCategories(){
+  document.getElementById('exercise-categories').classList.remove('hidden');
+  document.getElementById('exercise-list-view').classList.add('hidden');
+  document.getElementById('exercise-detail-view').classList.add('hidden');
+
+  const zone = document.getElementById('categories-list');
+  zone.innerHTML = CATEGORIES.map(c =>
+    `<div class="card" style="cursor:pointer" onclick="afficherExercicesCategorie('${c.id}',decodeURIComponent('${encodeURIComponent(c.label)}'))"><h3>${c.label}</h3></div>`
+  ).join('');
+}
+
+async function afficherExercicesCategorie(catId, catLabel){
+  if (catId){ categorieActuelle = { id: catId, label: catLabel }; }
+  document.getElementById('exercise-categories').classList.add('hidden');
+  document.getElementById('exercise-list-view').classList.remove('hidden');
+  document.getElementById('exercise-detail-view').classList.add('hidden');
+  document.getElementById('categoryTitle').textContent = categorieActuelle.label;
+
+  const zone = document.getElementById('exercises-list');
+  zone.innerHTML = '<p class="small">Chargement...</p>';
+
+  const { data, error } = await sb
+    .from('exercises')
+    .select('id, title, level')
+    .eq('type', categorieActuelle.id)
+    .order('created_at', { ascending: true });
+
+  if (error){ zone.innerHTML = '<p class="small bad">Erreur : ' + error.message + '</p>'; return; }
+  if (!data || data.length === 0){
+    zone.innerHTML = '<p class="small">Aucun exercice dans cette catégorie pour le moment.</p>';
+    return;
+  }
+
+  zone.innerHTML = data.map(e =>
+    `<div class="card" style="cursor:pointer;margin-top:10px" onclick="ouvrirExercice('${e.id}')"><span class="tag">${e.level || ''}</span><h3>${e.title}</h3></div>`
+  ).join('');
+}
+
+async function ouvrirExercice(id){
+  document.getElementById('exercise-list-view').classList.add('hidden');
+  document.getElementById('exercise-detail-view').classList.remove('hidden');
+  document.getElementById('questionsContainer').innerHTML = '<p class="small">Chargement...</p>';
+  document.getElementById('feedback').innerHTML = '';
+  document.getElementById('submitMessage').textContent = '';
+  document.getElementById('submitExerciseBtn').disabled = true;
+
+  const { data, error } = await sb
+    .from('exercises')
+    .select('id, title, level, content')
+    .eq('id', id)
+    .single();
+
+  if (error || !data){
+    document.getElementById('questionsContainer').innerHTML = '<p class="small bad">Erreur de chargement.</p>';
+    return;
+  }
+
+  exerciceActuel = data;
+  Object.keys(exerciseReponses).forEach(k => delete exerciseReponses[k]);
+
+  document.getElementById('exerciseTag').textContent = 'Exercice · ' + (data.level || '');
+  document.getElementById('exerciseTitle').textContent = data.title;
+
+  const questions = (data.content && data.content.questions) || [];
+  if (questions.length === 0){
+    document.getElementById('questionsContainer').innerHTML = '<p class="small">Cet exercice ne contient pas encore de questions.</p>';
+    return;
+  }
+
+  let html = '';
+  questions.forEach((q, i) => {
+    html += '<p><b>' + (i + 1) + '.</b> ' + q.text + '</p>';
+    (q.options || []).forEach((opt, oi) => {
+      const estCorrecte = (oi === q.correct);
+      html += '<button class="answer" onclick="check(' + i + ', this, ' + estCorrecte + ')">' + opt + '</button>';
+    });
+  });
+  document.getElementById('questionsContainer').innerHTML = html;
+  document.getElementById('submitExerciseBtn').dataset.total = questions.length;
+}
 
 function check(question, el, ok){
   exerciseReponses[question] = ok;
@@ -136,7 +245,7 @@ function check(question, el, ok){
     ? '<p class="ok">✓ Bonne réponse !</p>'
     : '<p class="bad">✗ À revoir. La bonne réponse dépend du contexte.</p>';
 
-  const total = 2;
+  const total = parseInt(document.getElementById('submitExerciseBtn').dataset.total || '0', 10);
   const repondu = Object.keys(exerciseReponses).length;
   document.getElementById('submitExerciseBtn').disabled = (repondu < total);
 }
@@ -241,32 +350,21 @@ async function enregistrerTentative(){
   msg.textContent = 'Envoi en cours...';
   msg.style.color = '#66788a';
   try{
+    if (!exerciceActuel){ msg.textContent = 'Aucun exercice sélectionné.'; msg.style.color = '#bd3e45'; return; }
+
     const { data: { user } } = await sb.auth.getUser();
     if (!user){ msg.textContent = 'Vous devez être connecté(e).'; msg.style.color = '#bd3e45'; return; }
-
-    const { data: exo, error: exoError } = await sb
-      .from('exercises')
-      .select('id')
-      .eq('title', 'Prépositions : à / de / en')
-      .limit(1)
-      .single();
-
-    if (exoError || !exo){
-      msg.textContent = "Erreur : exercice introuvable dans la base.";
-      msg.style.color = '#bd3e45';
-      return;
-    }
 
     const total = Object.keys(exerciseReponses).length;
     const correctes = Object.values(exerciseReponses).filter(v => v === true).length;
     const score = total > 0 ? Math.round((correctes / total) * 100) : 0;
     const erreurs = Object.entries(exerciseReponses)
       .filter(([q, ok]) => !ok)
-      .map(([q]) => 'question ' + q);
+      .map(([q]) => 'question ' + (parseInt(q, 10) + 1));
 
     const { error: insertError } = await sb.from('attempts').insert({
       student_id: user.id,
-      exercise_id: exo.id,
+      exercise_id: exerciceActuel.id,
       score: score,
       errors: erreurs
     });

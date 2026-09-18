@@ -299,7 +299,7 @@ async function chargerHistoriqueClasse(){
       score,
       errors,
       teacher_notes,
-      profiles ( id, full_name, email ),
+      profiles ( id, full_name ),
       exercises ( title, level )
     `)
     .order('attempted_at', { ascending: false });
@@ -316,7 +316,7 @@ async function chargerHistoriqueClasse(){
 
   let html = '<table><tr><th>Étudiant</th><th>Exercice</th><th>Niveau</th><th>Score</th><th>Date</th></tr>';
   data.forEach(t => {
-    const nomEtudiant = (t.profiles && (t.profiles.full_name || t.profiles.email)) || 'Inconnu';
+    const nomEtudiant = (t.profiles && t.profiles.full_name) || 'Inconnu';
     const titreExercice = (t.exercises && t.exercises.title) || '—';
     const niveauExercice = (t.exercises && t.exercises.level) || '—';
     const date = new Date(t.attempted_at).toLocaleDateString('fr-FR');

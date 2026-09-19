@@ -234,6 +234,7 @@ async function ouvrirExercice(id){
       const estCorrecte = (oi === q.correct);
       html += '<button class="answer" onclick="check(' + i + ', this, ' + estCorrecte + ')">' + opt + '</button>';
     });
+    html += '<div id="feedback-' + i + '" class="small"></div>';
   });
   document.getElementById('questionsContainer').innerHTML = html;
   document.getElementById('submitExerciseBtn').dataset.total = questions.length;
@@ -241,9 +242,12 @@ async function ouvrirExercice(id){
 
 function check(question, el, ok){
   exerciseReponses[question] = ok;
-  document.getElementById('feedback').innerHTML = ok
-    ? '<p class="ok">✓ Bonne réponse !</p>'
-    : '<p class="bad">✗ À revoir. La bonne réponse dépend du contexte.</p>';
+  const zone = document.getElementById('feedback-' + question);
+  if (zone){
+    zone.innerHTML = ok
+      ? '<p class="ok">✓ Bonne réponse !</p>'
+      : '<p class="bad">✗ À revoir. La bonne réponse dépend du contexte.</p>';
+  }
 
   const total = parseInt(document.getElementById('submitExerciseBtn').dataset.total || '0', 10);
   const repondu = Object.keys(exerciseReponses).length;
